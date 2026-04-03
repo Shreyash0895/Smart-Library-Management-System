@@ -1,7 +1,9 @@
 import javax.swing.*;
 import javax.swing.border.*;
 import java.awt.*;
-import java.sql.*;
+import com.mongodb.client.*;
+import com.mongodb.client.model.Filters;
+import org.bson.Document;
 
 public class LoginScreen extends JFrame {
     private JTextField usernameField;
@@ -17,56 +19,51 @@ public class LoginScreen extends JFrame {
         setLocationRelativeTo(null);
         setResizable(false);
 
-        // Create main panel with gradient
         mainPanel = new GradientPanel();
         mainPanel.setLayout(new GridBagLayout());
-
-        // Create login panel
         createLoginPanel();
-
-        // Add login panel to main panel
         mainPanel.add(loginPanel);
         add(mainPanel);
     }
 
     private void createLoginPanel() {
-        loginPanel = new RoundedPanel(20, new Color(255, 255, 255, 220));
+        loginPanel = new RoundedPanel(20, new Color(255,255,255,220));
         loginPanel.setLayout(new GridBagLayout());
-        loginPanel.setBorder(BorderFactory.createEmptyBorder(20, 40, 20, 40));
+        loginPanel.setBorder(BorderFactory.createEmptyBorder(20,40,20,40));
 
         GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(10, 10, 10, 10);
-
-        // Title
-        JLabel titleLabel = createTitleLabel();
-        gbc.gridx = 0;
-        gbc.gridy = 0;
-        gbc.gridwidth = 2;
-        gbc.anchor = GridBagConstraints.CENTER;
-        loginPanel.add(titleLabel, gbc);
-
-        // Username Field
-        gbc.gridy++;
+        gbc.insets = new Insets(10,10,10,10);
         gbc.gridwidth = 2;
         gbc.fill = GridBagConstraints.HORIZONTAL;
-        JPanel usernamePanel = createInputPanel("Username", "user.png");
+
+        // Title
+        JLabel titleLabel = new JLabel("Library Management System");
+        titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 24));
+        titleLabel.setForeground(new Color(44,62,80));
+        titleLabel.setHorizontalAlignment(SwingConstants.CENTER);
+        gbc.gridx = 0; gbc.gridy = 0;
+        loginPanel.add(titleLabel, gbc);
+
+        // Username
+        gbc.gridy++;
+        JPanel usernamePanel = createInputPanel("Username:");
         usernameField = new JTextField(20);
         styleTextField(usernameField);
         usernamePanel.add(usernameField);
         loginPanel.add(usernamePanel, gbc);
 
-        // Password Field
+        // Password
         gbc.gridy++;
-        JPanel passwordPanel = createInputPanel("Password", "lock.png");
+        JPanel passwordPanel = createInputPanel("Password:");
         passwordField = new JPasswordField(20);
         styleTextField(passwordField);
         passwordPanel.add(passwordField);
         loginPanel.add(passwordPanel, gbc);
 
-        // Role Selection
+        // Role
         gbc.gridy++;
-        JPanel rolePanel = createInputPanel("Role", "role.png");
-        String[] roles = {"Admin", "Librarian", "Student"};
+        JPanel rolePanel = createInputPanel("Role:");
+        String[] roles = {"Admin","Librarian","Student"};
         roleComboBox = new JComboBox<>(roles);
         styleComboBox(roleComboBox);
         rolePanel.add(roleComboBox);
@@ -74,131 +71,91 @@ public class LoginScreen extends JFrame {
 
         // Login Button
         gbc.gridy++;
-        gbc.insets = new Insets(20, 0, 10, 0);
-        CustomButton loginButton = new CustomButton("LOGIN", new Color(41, 128, 185), false);
+        gbc.insets = new Insets(20,0,10,0);
+        CustomButton loginButton = new CustomButton("LOGIN", new Color(41,128,185), false);
         loginButton.addActionListener(e -> handleLogin());
+        passwordField.addActionListener(e -> handleLogin());
         loginPanel.add(loginButton, gbc);
 
         // Sign Up Button
         gbc.gridy++;
-        CustomButton signUpButton = new CustomButton("Create New Account", new Color(46, 204, 113), false);
-        signUpButton.addActionListener(e -> openSignUpScreen());
+        gbc.insets = new Insets(0,0,10,0);
+        CustomButton signUpButton = new CustomButton("Create New Account", new Color(46,204,113), false);
+        signUpButton.addActionListener(e -> { new SignUpScreen().setVisible(true); dispose(); });
         loginPanel.add(signUpButton, gbc);
     }
 
-    private JLabel createTitleLabel() {
-        JLabel titleLabel = new JLabel("Library Management System");
-        titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 24));
-        titleLabel.setForeground(new Color(44, 62, 80));
-        return titleLabel;
-    }
-
-    private JPanel createInputPanel(String labelText, String iconName) {
-        JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
+    private JPanel createInputPanel(String labelText) {
+        JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT,10,5));
         panel.setOpaque(false);
-        
-        // Add icon
-        try {
-            ImageIcon icon = new ImageIcon(getClass().getResource("/icons/" + iconName));
-            Image img = icon.getImage().getScaledInstance(20, 20, Image.SCALE_SMOOTH);
-            JLabel iconLabel = new JLabel(new ImageIcon(img));
-            panel.add(iconLabel);
-        } catch (Exception e) {
-            JLabel label = new JLabel(labelText + ":");
-            label.setForeground(new Color(44, 62, 80));
-            label.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-            panel.add(label);
-        }
-        
+        JLabel label = new JLabel(labelText);
+        label.setForeground(new Color(44,62,80));
+        label.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        panel.add(label);
         return panel;
     }
 
     private void styleTextField(JTextField textField) {
-        textField.setPreferredSize(new Dimension(250, 35));
+        textField.setPreferredSize(new Dimension(250,35));
         textField.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         textField.setBorder(BorderFactory.createCompoundBorder(
-            new LineBorder(new Color(189, 195, 199), 1, true),
-            BorderFactory.createEmptyBorder(5, 10, 5, 10)
-        ));
-        textField.setBackground(new Color(255, 255, 255));
+            new LineBorder(new Color(189,195,199),1,true),
+            BorderFactory.createEmptyBorder(5,10,5,10)));
+        textField.setBackground(Color.WHITE);
     }
 
-    private void styleComboBox(JComboBox<String> comboBox) {
-        comboBox.setPreferredSize(new Dimension(250, 35));
-        comboBox.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        comboBox.setBorder(new LineBorder(new Color(189, 195, 199), 1, true));
-        comboBox.setBackground(Color.WHITE);
+    private void styleComboBox(JComboBox<String> c) {
+        c.setPreferredSize(new Dimension(250,35));
+        c.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        c.setBorder(new LineBorder(new Color(189,195,199),1,true));
+        c.setBackground(Color.WHITE);
     }
 
     private void handleLogin() {
-        String username = usernameField.getText();
+        String username = usernameField.getText().trim();
         String password = new String(passwordField.getPassword());
-        String role = (String) roleComboBox.getSelectedItem();
+        String role     = (String) roleComboBox.getSelectedItem();
 
         if (username.isEmpty() || password.isEmpty()) {
-            showError("Please enter both username and password!");
-            return;
+            showError("Please enter both username and password!"); return;
         }
 
         try {
-            Connection conn = DatabaseConnection.getConnection();
-            String query = "SELECT * FROM users WHERE username = ? AND password = ? AND role = ? AND is_active = true";
-            PreparedStatement pstmt = conn.prepareStatement(query);
-            pstmt.setString(1, username);
-            pstmt.setString(2, password);
-            pstmt.setString(3, role.toUpperCase());
+            MongoCollection<Document> users = DatabaseConnection.getCollection("users");
+            if (users == null) { showError("Cannot connect to MongoDB.\nMake sure MongoDB is running!"); return; }
 
-            ResultSet rs = pstmt.executeQuery();
-            if (rs.next()) {
-                int userId = rs.getInt("user_id");
-                showSuccess("Login successful!");
-                openDashboard(userId, role);
-            } else {
-                showError("Invalid credentials or account not activated!");
+            Document user = users.find(Filters.and(
+                Filters.eq("username", username),
+                Filters.eq("password", password),
+                Filters.eq("role", role.toUpperCase())
+            )).first();
+
+            if (user == null) { showError("Invalid credentials!"); return; }
+
+            Boolean approved = user.getBoolean("is_approved");
+            if (approved == null || !approved) {
+                showError("Your account is pending admin approval.\nPlease wait for approval."); return;
             }
-        } catch (SQLException ex) {
+
+            String userId = user.getObjectId("_id").toString();
+            dispose();
+            switch (role.toUpperCase()) {
+                case "ADMIN":     new AdminDashboard(userId).setVisible(true);     break;
+                case "LIBRARIAN": new LibrarianDashboard(userId).setVisible(true); break;
+                case "STUDENT":   new StudentDashboard(userId).setVisible(true);   break;
+            }
+        } catch (Exception ex) {
             ex.printStackTrace();
-            showError("Database error occurred: " + ex.getMessage());
+            showError("Database error: " + ex.getMessage());
         }
     }
 
-    private void openSignUpScreen() {
-        this.dispose();
-        new SignUpScreen().setVisible(true);
-    }
-
-    private void openDashboard(int userId, String role) {
-        this.dispose();
-        switch (role.toUpperCase()) {
-            case "ADMIN":
-                new AdminDashboard(userId).setVisible(true);
-                break;
-            case "LIBRARIAN":
-                new LibrarianDashboard(userId).setVisible(true);
-                break;
-            case "STUDENT":
-                new StudentDashboard(userId).setVisible(true);
-                break;
-        }
-    }
-
-    private void showError(String message) {
-        JOptionPane.showMessageDialog(this, message, "Error", JOptionPane.ERROR_MESSAGE);
-    }
-
-    private void showSuccess(String message) {
-        JOptionPane.showMessageDialog(this, message, "Success", JOptionPane.INFORMATION_MESSAGE);
+    private void showError(String msg) {
+        JOptionPane.showMessageDialog(this, msg, "Error", JOptionPane.ERROR_MESSAGE);
     }
 
     public static void main(String[] args) {
-        try {
-            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        
-        SwingUtilities.invokeLater(() -> {
-            new LoginScreen().setVisible(true);
-        });
+        try { UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName()); } catch (Exception e) {}
+        SwingUtilities.invokeLater(() -> new LoginScreen().setVisible(true));
     }
 }

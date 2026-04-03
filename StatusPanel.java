@@ -1,95 +1,94 @@
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
-import java.sql.*;
+import com.mongodb.client.*;
+import com.mongodb.client.model.Filters;
+import org.bson.Document;
+import org.bson.types.ObjectId;
 
 public class StatusPanel extends JPanel {
-    private int userId;
-    private JTable borrowingsTable;
-    private DefaultTableModel tableModel;
+
+    private String userId;
+    private JTable table;
+    private DefaultTableModel model;
     private JLabel fineLabel;
 
-    public StatusPanel(int userId) {
+    public StatusPanel(String userId) {
+
         this.userId = userId;
+
         setLayout(new BorderLayout());
-        
-        // Create header panel with fine information
-        JPanel headerPanel = createHeaderPanel();
-        add(headerPanel, BorderLayout.NORTH);
-        
-        // Create table
-        createBorrowingsTable();
-        JScrollPane scrollPane = new JScrollPane(borrowingsTable);
-        add(scrollPane, BorderLayout.CENTER);
-        
-        // Load data
-        loadBorrowings();
-        updateFineAmount();
+
+        add(createHeader(), BorderLayout.NORTH);
+
+        createTable();
+        add(new JScrollPane(table), BorderLayout.CENTER);
+
+        loadData();
+        updateFine();
     }
 
-    private JPanel createHeaderPanel() {
-        JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        fineLabel = new JLabel("Total Outstanding Fines: $0.00");
+    private JPanel createHeader() {
+        JPanel panel = new JPanel();
+        fineLabel = new JLabel("Total Outstanding Fines: ₹0");
         fineLabel.setFont(new Font("Arial", Font.BOLD, 14));
         panel.add(fineLabel);
         return panel;
     }
 
-    private void createBorrowingsTable() {
-        String[] columns = {"Book Title", "Borrow Date", "Due Date", "Status", "Fine"};
-        tableModel = new DefaultTableModel(columns, 0) {
-            @Override
-            public boolean isCellEditable(int row, int column) {
-                return false;
-            }
-        };
-        borrowingsTable = new JTable(tableModel);
+    private void createTable() {
+        String[] cols = {"Book", "Borrow Date", "Due Date", "Status", "Fine"};
+
+        model = new DefaultTableModel(cols, 0);
+        table = new JTable(model);
     }
 
-    private void loadBorrowings() {
-        tableModel.setRowCount(0);
-        try {
-            Connection conn = DatabaseConnection.getConnection();
-            String query = "SELECT b.title, bb.borrow_date, bb.due_date, bb.status, bb.fine_amount " +
-                          "FROM book_borrowings bb " +
-                          "JOIN books b ON bb.book_id = b.book_id " +
-                          "WHERE bb.user_id = ? " +
-                          "ORDER BY bb.borrow_date DESC";
-            PreparedStatement pstmt = conn.prepareStatement(query);
-            pstmt.setInt(1, userId);
-            
-            ResultSet rs = pstmt.executeQuery();
-            while (rs.next()) {
-                Object[] row = {
-                    rs.getString("title"),
-                    rs.getDate("borrow_date"),
-                    rs.getDate("due_date"),
-                    rs.getString("status"),
-                    String.format("$%.2f", rs.getDouble("fine_amount"))
-                };
-                tableModel.addRow(row);
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-            JOptionPane.showMessageDialog(this, "Error loading borrowing history: " + e.getMessage());
+    // ================= LOAD =================
+    private void loadData() {
+
+        model.setRowCount(0);
+
+        MongoCollection<Document> borrowings =
+                DatabaseConnection.getCollection("book_borrowings");
+
+        MongoCollection<Document> books =
+                DatabaseConnection.getCollection("books");
+
+        for (Document doc : borrowings.find(
+                Filters.eq("user_id", userId)
+        )) {
+
+            Document book = books.find(
+                    Filters.eq("_id", new ObjectId(doc.getString("book_id")))
+            ).first();
+
+            model.addRow(new Object[]{
+                    (book != null) ? book.getString("title") : "Unknown",
+                    new java.util.Date(doc.getLong("borrow_date")),
+                    new java.util.Date(doc.getLong("due_date")),
+                    doc.getString("status"),
+                    "₹" + doc.getDouble("fine_amount", 0.0)
+            });
         }
     }
 
-    private void updateFineAmount() {
-        try {
-            Connection conn = DatabaseConnection.getConnection();
-            String query = "SELECT SUM(fine_amount) FROM book_borrowings WHERE user_id = ? AND fine_paid = false";
-            PreparedStatement pstmt = conn.prepareStatement(query);
-            pstmt.setInt(1, userId);
-            
-            ResultSet rs = pstmt.executeQuery();
-            if (rs.next()) {
-                double totalFine = rs.getDouble(1);
-                fineLabel.setText(String.format("Total Outstanding Fines: $%.2f", totalFine));
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-            JOptionPane.showMessageDialog(this, "Error calculating fines: " + e.getMessage());
+    // ================= FINE =================
+    private void updateFine() {
+
+        double total = 0;
+
+        MongoCollection<Document> borrowings =
+                DatabaseConnection.getCollection("book_borrowings");
+
+        for (Document doc : borrowings.find(
+                Filters.and(
+                        Filters.eq("user_id", userId),
+                        Filters.eq("fine_paid", false)
+                )
+        )) {
+            total += doc.getDouble("fine_amount", 0.0);
         }
+
+        fineLabel.setText("Total Outstanding Fines: ₹" + total);
     }
 }

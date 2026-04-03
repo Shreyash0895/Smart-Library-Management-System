@@ -1,366 +1,185 @@
 import javax.swing.*;
 import java.awt.*;
-import java.sql.*;
+import com.mongodb.client.model.Filters;
+import org.bson.Document;
 
 public class AdminDashboard extends JFrame {
-    private int userId;
+    private String userId;
     private JPanel contentPanel;
     private JLabel statusLabel;
     private boolean isDarkMode = false;
-    private Color darkBackground = new Color(33, 33, 33);
-    private Color lightBackground = new Color(242, 242, 242);
-    private Color darkMenuBackground = new Color(50, 50, 50);
-    private Color lightMenuBackground = new Color(230, 230, 230);
+    private Color darkBg   = new Color(33,33,33),   lightBg   = new Color(242,242,242);
+    private Color darkMenu = new Color(30,30,30),    lightMenu = new Color(44,62,80);
     private JPanel menuPanel;
+    private final Color BTN_BLUE   = new Color(52,152,219), BTN_BLUE_H  = new Color(41,128,185);
+    private final Color BTN_RED    = new Color(231,76,60),  BTN_RED_H   = new Color(192,57,43);
+    private final Color BTN_GREEN  = new Color(39,174,96),  BTN_GREEN_H = new Color(30,140,75);
+    private final Color BTN_DARK   = new Color(70,70,70),   BTN_DARK_H  = new Color(100,100,100);
 
-    public AdminDashboard(int userId) {
+    public AdminDashboard(String userId) {
         this.userId = userId;
         setTitle("Library Management System - Admin Dashboard");
-        setSize(1200, 800);
+        setSize(1200,800);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
 
-        // Create main split pane
-        JSplitPane splitPane = new JSplitPane();
-        splitPane.setDividerLocation(250);
-        
-        // Create menu panel
+        JSplitPane split = new JSplitPane();
+        split.setDividerLocation(250);
         menuPanel = createMenuPanel();
-        splitPane.setLeftComponent(menuPanel);
-        
-        // Create content panel
+        split.setLeftComponent(menuPanel);
         contentPanel = new JPanel(new BorderLayout());
-        contentPanel.setBackground(isDarkMode ? darkBackground : lightBackground);
-        splitPane.setRightComponent(contentPanel);
-        
-        // Create status bar
+        split.setRightComponent(contentPanel);
+
         statusLabel = new JLabel("Welcome, Admin!");
-        statusLabel.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
+        statusLabel.setBorder(BorderFactory.createEmptyBorder(5,10,5,10));
         statusLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
         add(statusLabel, BorderLayout.SOUTH);
-        
-        add(splitPane);
-        
-        // Show welcome message
+        add(split);
+
         showWelcomeMessage();
-        
-        // Load pending approvals count
-        loadPendingApprovalsCount();
-        
-        // Apply initial theme
+        loadPendingCount();
         applyTheme();
     }
 
     private JPanel createMenuPanel() {
-        JPanel panel = new JPanel();
-        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
-        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-        panel.setBackground(isDarkMode ? darkMenuBackground : lightMenuBackground);
+        JPanel p = new JPanel();
+        p.setLayout(new BoxLayout(p, BoxLayout.Y_AXIS));
+        p.setBorder(BorderFactory.createEmptyBorder(15,10,10,10));
+        p.setBackground(lightMenu);
 
-        // Add admin profile section
-        JPanel profilePanel = new JPanel(new BorderLayout());
-        profilePanel.setOpaque(false);
-        JLabel adminLabel = new JLabel("Administrator");
-        adminLabel.setFont(new Font("Segoe UI", Font.BOLD, 16));
-        adminLabel.setForeground(isDarkMode ? Color.WHITE : Color.BLACK);
-        profilePanel.add(adminLabel, BorderLayout.CENTER);
-        panel.add(profilePanel);
-        panel.add(Box.createRigidArea(new Dimension(0, 20)));
+        JLabel lbl = new JLabel("Administrator");
+        lbl.setFont(new Font("Segoe UI", Font.BOLD, 16));
+        lbl.setForeground(Color.WHITE);
+        p.add(lbl);
+        p.add(Box.createRigidArea(new Dimension(0,15)));
 
-        String[] menuItems = {
-            "Dashboard Home",
-            "Manage Librarians",
-            "View Reports",
-            "Fine Management",
-            "User Approvals",
-            "System Settings",
-            "Toggle Theme",
-            "Logout"
-        };
+        JSeparator sep = new JSeparator();
+        sep.setForeground(new Color(100,120,140));
+        sep.setMaximumSize(new Dimension(230,2));
+        p.add(sep);
+        p.add(Box.createRigidArea(new Dimension(0,10)));
 
-        for (String item : menuItems) {
-            JButton button = createMenuButton(item);
-            panel.add(button);
-            panel.add(Box.createRigidArea(new Dimension(0, 10)));
+        for (String item : new String[]{"Dashboard Home","📷 ISBN Scanner","Manage Librarians",
+                "View Reports","Fine Management","User Approvals","System Settings","Toggle Theme","Logout"}) {
+            p.add(menuBtn(item));
+            p.add(Box.createRigidArea(new Dimension(0,8)));
         }
-
-        return panel;
+        return p;
     }
 
-    private JButton createMenuButton(String text) {
-        JButton button = new JButton(text);
-        button.setMaximumSize(new Dimension(230, 40));
-        button.setPreferredSize(new Dimension(230, 40));
-        button.setAlignmentX(Component.CENTER_ALIGNMENT);
-        button.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        button.setFocusPainted(false);
-        button.setBorderPainted(false);
-        button.setBackground(isDarkMode ? new Color(70, 70, 70) : new Color(70, 130, 180));
-        button.setForeground(Color.WHITE);
-        
-        button.addActionListener(e -> {
-            switch (text) {
-                case "Dashboard Home":
-                    showWelcomeMessage();
-                    break;
-                case "Manage Librarians":
-                    showLibrarianManagement();
-                    break;
-                case "View Reports":
-                    showReports();
-                    break;
-                case "Fine Management":
-                    showFineManagement();
-                    break;
-                case "User Approvals":
-                    showUserApprovals();
-                    break;
-                case "System Settings":
-                    showSettings();
-                    break;
-                case "Toggle Theme":
-                    toggleTheme();
-                    break;
-                case "Logout":
-                    logout();
-                    break;
+    private JButton menuBtn(String text) {
+        JButton b = new JButton(text);
+        b.setMaximumSize(new Dimension(230,42)); b.setPreferredSize(new Dimension(230,42));
+        b.setAlignmentX(Component.CENTER_ALIGNMENT);
+        b.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        b.setFocusPainted(false); b.setBorderPainted(false);
+        b.setCursor(new Cursor(Cursor.HAND_CURSOR)); b.setForeground(Color.WHITE);
+
+        Color nc = text.equals("Logout")       ? BTN_RED   :
+                   text.equals("Toggle Theme") ? BTN_GREEN :
+                   isDarkMode ? BTN_DARK : BTN_BLUE;
+        Color hc = text.equals("Logout")       ? BTN_RED_H   :
+                   text.equals("Toggle Theme") ? BTN_GREEN_H :
+                   isDarkMode ? BTN_DARK_H : BTN_BLUE_H;
+        b.setBackground(nc);
+        b.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseEntered(java.awt.event.MouseEvent e) { b.setBackground(hc); }
+            public void mouseExited (java.awt.event.MouseEvent e) { b.setBackground(nc); }
+        });
+        b.addActionListener(e -> {
+            switch(text) {
+                case "Dashboard Home":    showWelcomeMessage();      break;
+                case "📷 ISBN Scanner":  showPanel(new ISBNScannerPanel()); updateStatus("ISBN Scanner"); break;
+                case "Manage Librarians":showPanel(new LibrarianManagementPanel()); updateStatus("Manage Librarians"); break;
+                case "View Reports":     showPanel(new ReportsPanel()); updateStatus("Reports"); break;
+                case "Fine Management":  showPanel(new FineManagementPanel()); updateStatus("Fine Management"); break;
+                case "User Approvals":   showPanel(new UserApprovalPanel()); updateStatus("User Approvals"); break;
+                case "System Settings":  showPanel(new SettingsPanel(userId)); updateStatus("Settings"); break;
+                case "Toggle Theme":     toggleTheme(); break;
+                case "Logout":           logout(); break;
             }
         });
-        
-        return button;
+        return b;
     }
 
-    private void toggleTheme() {
-        isDarkMode = !isDarkMode;
-        applyTheme();
-    }
+    private void showPanel(JPanel p) { contentPanel.removeAll(); contentPanel.add(p); contentPanel.revalidate(); contentPanel.repaint(); }
+
+    private void toggleTheme() { isDarkMode = !isDarkMode; applyTheme(); }
 
     private void applyTheme() {
-        // Apply theme to menu panel
-        menuPanel.setBackground(isDarkMode ? darkMenuBackground : lightMenuBackground);
-        
-        // Apply theme to content panel
-        contentPanel.setBackground(isDarkMode ? darkBackground : lightBackground);
-        
-        // Update button colors
+        menuPanel.setBackground(isDarkMode ? darkMenu : lightMenu);
+        contentPanel.setBackground(isDarkMode ? darkBg : lightBg);
         for (Component c : menuPanel.getComponents()) {
             if (c instanceof JButton) {
-                JButton button = (JButton) c;
-                button.setBackground(isDarkMode ? new Color(70, 70, 70) : new Color(70, 130, 180));
-                button.setForeground(Color.WHITE);
+                JButton b = (JButton)c;
+                b.setBackground(b.getText().equals("Logout") ? BTN_RED :
+                    b.getText().equals("Toggle Theme") ? BTN_GREEN :
+                    isDarkMode ? BTN_DARK : BTN_BLUE);
+                b.setForeground(Color.WHITE);
             }
         }
-
-        // Update status bar
-        statusLabel.setBackground(isDarkMode ? darkBackground : lightBackground);
         statusLabel.setForeground(isDarkMode ? Color.WHITE : Color.BLACK);
-
-        // Refresh the UI
         SwingUtilities.updateComponentTreeUI(this);
     }
 
     private void showWelcomeMessage() {
         contentPanel.removeAll();
-        
-        JPanel welcomePanel = new JPanel(new GridBagLayout());
-        welcomePanel.setBackground(isDarkMode ? darkBackground : lightBackground);
+        JPanel wp = new JPanel(new GridBagLayout());
+        wp.setBackground(isDarkMode ? darkBg : lightBg);
         GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(10, 10, 10, 10);
-        
-        // Welcome message
-        JLabel welcomeLabel = new JLabel("Welcome to Admin Dashboard");
-        welcomeLabel.setFont(new Font("Segoe UI", Font.BOLD, 24));
-        welcomeLabel.setForeground(isDarkMode ? Color.WHITE : Color.BLACK);
-        gbc.gridx = 0;
-        gbc.gridy = 0;
-        welcomePanel.add(welcomeLabel, gbc);
-        
-        // Stats panel
-        JPanel statsPanel = createStatsPanel();
-        gbc.gridy = 1;
-        welcomePanel.add(statsPanel, gbc);
-        
-        contentPanel.add(welcomePanel);
-        contentPanel.revalidate();
-        contentPanel.repaint();
+        gbc.insets = new Insets(10,10,10,10);
+
+        JLabel wl = new JLabel("Welcome to Admin Dashboard");
+        wl.setFont(new Font("Segoe UI", Font.BOLD, 24));
+        wl.setForeground(isDarkMode ? Color.WHITE : Color.BLACK);
+        gbc.gridx = 0; gbc.gridy = 0; wp.add(wl, gbc);
+
+        gbc.gridy = 1; wp.add(createStatsPanel(), gbc);
+        contentPanel.add(wp); contentPanel.revalidate(); contentPanel.repaint();
         updateStatus("Welcome to Dashboard");
     }
 
     private JPanel createStatsPanel() {
-        JPanel panel = new JPanel(new GridLayout(2, 2, 20, 20));
-        panel.setBackground(isDarkMode ? darkBackground : lightBackground);
-        panel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
-
-        // Add stat cards
-        panel.add(createStatCard("Total Users", getTotalUsers()));
-        panel.add(createStatCard("Total Books", getTotalBooks()));
-        panel.add(createStatCard("Active Loans", getActiveLoanCount()));
-        panel.add(createStatCard("Pending Approvals", getPendingApprovals()));
-
-        return panel;
+        JPanel p = new JPanel(new GridLayout(2,2,20,20));
+        p.setBackground(isDarkMode ? darkBg : lightBg);
+        p.setBorder(BorderFactory.createEmptyBorder(20,20,20,20));
+        p.add(statCard("Total Users",       count("users", null)));
+        p.add(statCard("Total Books",       count("books", null)));
+        p.add(statCard("Active Loans",      count("book_borrowings", Filters.eq("status","BORROWED"))));
+        p.add(statCard("Pending Approvals", count("users", Filters.eq("is_approved", false))));
+        return p;
     }
 
-    private JPanel createStatCard(String title, int value) {
-        JPanel card = new JPanel(new BorderLayout(5, 5));
-        card.setBackground(isDarkMode ? new Color(45, 45, 45) : new Color(255, 255, 255));
-        card.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(isDarkMode ? new Color(60, 60, 60) : new Color(200, 200, 200)),
-            BorderFactory.createEmptyBorder(15, 15, 15, 15)
-        ));
+    private long count(String col, org.bson.conversions.Bson filter) {
+        try {
+            var c = DatabaseConnection.getCollection(col);
+            return filter == null ? c.countDocuments() : c.countDocuments(filter);
+        } catch(Exception e) { return 0; }
+    }
 
-        JLabel titleLabel = new JLabel(title);
-        titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 14));
-        titleLabel.setForeground(isDarkMode ? Color.WHITE : Color.BLACK);
-        
-        JLabel valueLabel = new JLabel(String.valueOf(value));
-        valueLabel.setFont(new Font("Segoe UI", Font.BOLD, 24));
-        valueLabel.setForeground(isDarkMode ? new Color(70, 130, 180) : new Color(70, 130, 180));
-        
-        card.add(titleLabel, BorderLayout.NORTH);
-        card.add(valueLabel, BorderLayout.CENTER);
-        
+    private JPanel statCard(String title, long value) {
+        JPanel card = new JPanel(new BorderLayout(5,5));
+        card.setBackground(isDarkMode ? new Color(45,45,45) : Color.WHITE);
+        card.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(isDarkMode ? new Color(60,60,60) : new Color(200,200,200)),
+            BorderFactory.createEmptyBorder(15,15,15,15)));
+        JLabel tl = new JLabel(title); tl.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        tl.setForeground(isDarkMode ? Color.WHITE : Color.BLACK);
+        JLabel vl = new JLabel(String.valueOf(value)); vl.setFont(new Font("Segoe UI", Font.BOLD, 24));
+        vl.setForeground(new Color(52,152,219));
+        card.add(tl, BorderLayout.NORTH); card.add(vl, BorderLayout.CENTER);
         return card;
     }
 
-    private void showLibrarianManagement() {
-        contentPanel.removeAll();
-        LibrarianManagementPanel panel = new LibrarianManagementPanel();
-        panel.setBackground(isDarkMode ? darkBackground : lightBackground);
-        contentPanel.add(panel);
-        contentPanel.revalidate();
-        contentPanel.repaint();
-        updateStatus("Managing Librarians");
-    }
-
-    private void showReports() {
-        contentPanel.removeAll();
-        ReportsPanel panel = new ReportsPanel();
-        panel.setBackground(isDarkMode ? darkBackground : lightBackground);
-        contentPanel.add(panel);
-        contentPanel.revalidate();
-        contentPanel.repaint();
-        updateStatus("Viewing Reports");
-    }
-
-    private void showFineManagement() {
-        contentPanel.removeAll();
-        FineManagementPanel panel = new FineManagementPanel();
-        panel.setBackground(isDarkMode ? darkBackground : lightBackground);
-        contentPanel.add(panel);
-        contentPanel.revalidate();
-        contentPanel.repaint();
-        updateStatus("Managing Fines");
-    }
-
-    private void showUserApprovals() {
-        contentPanel.removeAll();
-        UserApprovalPanel panel = new UserApprovalPanel();
-        panel.setBackground(isDarkMode ? darkBackground : lightBackground);
-        contentPanel.add(panel);
-        contentPanel.revalidate();
-        contentPanel.repaint();
-        updateStatus("Managing User Approvals");
-    }
-
-    private void showSettings() {
-        contentPanel.removeAll();
-        SettingsPanel panel = new SettingsPanel(userId);
-        panel.setBackground(isDarkMode ? darkBackground : lightBackground);
-        contentPanel.add(panel);
-        contentPanel.revalidate();
-        contentPanel.repaint();
-        updateStatus("System Settings");
+    private void loadPendingCount() {
+        long c = count("users", Filters.eq("is_approved", false));
+        if (c > 0) updateStatus("You have " + c + " pending user approvals");
     }
 
     private void logout() {
-        int confirm = JOptionPane.showConfirmDialog(
-            this,
-            "Are you sure you want to logout?",
-            "Confirm Logout",
-            JOptionPane.YES_NO_OPTION
-        );
-        
-        if (confirm == JOptionPane.YES_OPTION) {
-            this.dispose();
-            new LoginScreen().setVisible(true);
-        }
+        int c = JOptionPane.showConfirmDialog(this, "Are you sure you want to logout?", "Confirm Logout", JOptionPane.YES_NO_OPTION);
+        if (c == JOptionPane.YES_OPTION) { dispose(); new LoginScreen().setVisible(true); }
     }
 
-    private void updateStatus(String message) {
-        statusLabel.setText("Status: " + message);
-    }
-
-    private void loadPendingApprovalsCount() {
-        try {
-            Connection conn = DatabaseConnection.getConnection();
-            String query = "SELECT COUNT(*) FROM users WHERE is_active = false";
-            Statement stmt = conn.createStatement();
-            ResultSet rs = stmt.executeQuery(query);
-            
-            if (rs.next() && rs.getInt(1) > 0) {
-                updateStatus("You have " + rs.getInt(1) + " pending user approvals");
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-    }
-
-    // Database utility methods
-    private int getTotalUsers() {
-        try {
-            Connection conn = DatabaseConnection.getConnection();
-            Statement stmt = conn.createStatement();
-            ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM users WHERE is_active = true");
-            if (rs.next()) {
-                return rs.getInt(1);
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return 0;
-    }
-
-    private int getTotalBooks() {
-        try {
-            Connection conn = DatabaseConnection.getConnection();
-            Statement stmt = conn.createStatement();
-            ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM books WHERE is_active = true");
-            if (rs.next()) {
-                return rs.getInt(1);
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return 0;
-    }
-
-    private int getActiveLoanCount() {
-        try {
-            Connection conn = DatabaseConnection.getConnection();
-            Statement stmt = conn.createStatement();
-            ResultSet rs = stmt.executeQuery(
-                "SELECT COUNT(*) FROM book_borrowings WHERE status = 'BORROWED'"
-            );
-            if (rs.next()) {
-                return rs.getInt(1);
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return 0;
-    }
-
-    private int getPendingApprovals() {
-        try {
-            Connection conn = DatabaseConnection.getConnection();
-            Statement stmt = conn.createStatement();
-            ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM users WHERE is_active = false");
-            if (rs.next()) {
-                return rs.getInt(1);
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return 0;
-    }
+    private void updateStatus(String msg) { statusLabel.setText("Status: " + msg); }
 }

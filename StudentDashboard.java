@@ -1,275 +1,133 @@
 import javax.swing.*;
 import java.awt.*;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import com.mongodb.client.model.Filters;
+import org.bson.Document;
+import org.bson.types.ObjectId;
 
 public class StudentDashboard extends JFrame {
-    private int userId;
+    private String userId;
     private JPanel contentPanel;
     private boolean isDarkMode = false;
-    private Color darkBackground = new Color(33, 33, 33);
-    private Color lightBackground = new Color(242, 242, 242);
-    private Color darkMenuBackground = new Color(50, 50, 50);
-    private Color lightMenuBackground = new Color(230, 230, 230);
+    private Color darkBg = new Color(33,33,33), lightBg = new Color(242,242,242);
+    private Color darkMenu = new Color(50,50,50), lightMenu = new Color(44,62,80);
     private JPanel menuPanel;
 
-    public StudentDashboard(int userId) {
+    public StudentDashboard(String userId) {
         this.userId = userId;
         setTitle("Library Management System - Student Dashboard");
-        setSize(1200, 800);
+        setSize(1200,800);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
 
-        // Create split pane
-        JSplitPane splitPane = new JSplitPane();
-        splitPane.setBorder(null);
-        
-        // Create menu panel
-        menuPanel = createMenuPanel();
-        contentPanel = new JPanel();
-        contentPanel.setLayout(new BorderLayout());
-        
+        JSplitPane split = new JSplitPane();
+        split.setBorder(null);
+        menuPanel    = createMenuPanel();
+        contentPanel = new JPanel(new BorderLayout());
         showWelcomeMessage();
-
-        splitPane.setLeftComponent(menuPanel);
-        splitPane.setRightComponent(contentPanel);
-        splitPane.setDividerLocation(250);
-        splitPane.setDividerSize(1);
-
-        add(splitPane);
+        split.setLeftComponent(menuPanel);
+        split.setRightComponent(contentPanel);
+        split.setDividerLocation(250);
+        add(split);
         applyTheme();
     }
 
     private JPanel createMenuPanel() {
-        JPanel panel = new JPanel();
-        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
-        panel.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
+        JPanel p = new JPanel();
+        p.setLayout(new BoxLayout(p, BoxLayout.Y_AXIS));
+        p.setBorder(BorderFactory.createEmptyBorder(15,15,15,15));
+        p.setBackground(lightMenu);
 
-        // Add profile section
-        JPanel profilePanel = new JPanel(new BorderLayout());
-        profilePanel.setOpaque(false);
-        JLabel userLabel = new JLabel("Student Dashboard");
-        userLabel.setFont(new Font("Segoe UI", Font.BOLD, 20));
-        profilePanel.add(userLabel, BorderLayout.CENTER);
-        panel.add(profilePanel);
-        panel.add(Box.createRigidArea(new Dimension(0, 30)));
+        JLabel lbl = new JLabel("Student Dashboard");
+        lbl.setFont(new Font("Segoe UI", Font.BOLD, 18));
+        lbl.setForeground(Color.WHITE);
+        p.add(lbl);
+        p.add(Box.createRigidArea(new Dimension(0,25)));
 
-        String[] menuItems = {
-            "Borrow Books",
-            "Return Books",
-            "View Status",
-            "Request Books",
-            "Notifications",
-            "Toggle Theme",
-            "Logout"
-        };
-
-        for (String item : menuItems) {
-            JButton button = createMenuButton(item);
-            panel.add(button);
-            panel.add(Box.createRigidArea(new Dimension(0, 10)));
+        for (String item : new String[]{"Borrow Books","Return Books","Request Books",
+                "View Status","Notifications","Toggle Theme","Logout"}) {
+            JButton b = menuBtn(item);
+            p.add(b);
+            p.add(Box.createRigidArea(new Dimension(0,10)));
         }
-
-        return panel;
+        return p;
     }
 
-    private JButton createMenuButton(String text) {
-        JButton button = new JButton(text);
-        button.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        button.setAlignmentX(Component.CENTER_ALIGNMENT);
-        button.setMaximumSize(new Dimension(200, 40));
-        button.setFocusPainted(false);
-        button.setBorderPainted(false);
-        
-        button.addActionListener(e -> {
-            switch(text) {
-                case "Borrow Books":
-                    showBorrowBooks();
-                    break;
-                case "Return Books":
-                    showReturnBooks();
-                    break;
-                case "View Status":
-                    showStatus();
-                    break;
-                case "Request Books":
-                    showRequestBooks();
-                    break;
-                case "Notifications":
-                    showNotifications();
-                    break;
-                case "Toggle Theme":
-                    toggleTheme();
-                    break;
-                case "Logout":
-                    logout();
-                    break;
-            }
-        });
-        
-        return button;
+    private JButton menuBtn(String text) {
+        JButton b = new JButton(text);
+        b.setMaximumSize(new Dimension(210,40));
+        b.setAlignmentX(Component.CENTER_ALIGNMENT);
+        b.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        b.setFocusPainted(false); b.setBorderPainted(false);
+        b.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        Color bg = text.equals("Logout") ? new Color(231,76,60) :
+                   text.equals("Toggle Theme") ? new Color(39,174,96) : new Color(52,152,219);
+        b.setBackground(bg); b.setForeground(Color.WHITE);
+        b.addActionListener(e -> handleMenu(text));
+        return b;
     }
 
-    private void toggleTheme() {
-        isDarkMode = !isDarkMode;
-        applyTheme();
+    private void handleMenu(String item) {
+        contentPanel.removeAll();
+        switch(item) {
+            case "Borrow Books":  contentPanel.add(new BorrowBooksPanel(userId));            break;
+            case "Return Books":  contentPanel.add(new ReturnBooksPanel(userId, isDarkMode)); break;
+            case "Request Books": contentPanel.add(new RequestBooksPanel(userId));            break;
+            case "View Status":   contentPanel.add(new StatusPanel(userId));                  break;
+            case "Notifications": contentPanel.add(new NotificationPanel(userId, isDarkMode));break;
+            case "Toggle Theme":  toggleTheme(); return;
+            case "Logout":        logout();      return;
+        }
+        contentPanel.revalidate(); contentPanel.repaint();
     }
+
+    private void toggleTheme() { isDarkMode = !isDarkMode; applyTheme(); }
 
     private void applyTheme() {
-        // Apply theme to menu panel
-        menuPanel.setBackground(isDarkMode ? darkMenuBackground : lightMenuBackground);
-        
-        // Apply theme to content panel
-        contentPanel.setBackground(isDarkMode ? darkBackground : lightBackground);
-        
-        // Update button colors
+        menuPanel.setBackground(isDarkMode ? darkMenu : lightMenu);
+        contentPanel.setBackground(isDarkMode ? darkBg : lightBg);
         for (Component c : menuPanel.getComponents()) {
-            if (c instanceof JButton) {
-                JButton button = (JButton) c;
-                button.setBackground(isDarkMode ? new Color(70, 70, 70) : new Color(70, 130, 180));
-                button.setForeground(Color.WHITE);
-            } else if (c instanceof JPanel) {
-                // Update profile section
-                JPanel panel = (JPanel) c;
-                panel.setBackground(isDarkMode ? darkMenuBackground : lightMenuBackground);
-                for (Component comp : panel.getComponents()) {
-                    if (comp instanceof JLabel) {
-                        ((JLabel) comp).setForeground(isDarkMode ? Color.WHITE : Color.BLACK);
-                    }
-                }
-            }
+            if (c instanceof JLabel) ((JLabel)c).setForeground(Color.WHITE);
         }
-
-        // Refresh the UI
         SwingUtilities.updateComponentTreeUI(this);
     }
 
     private void showWelcomeMessage() {
         contentPanel.removeAll();
-        
-        JPanel welcomePanel = new JPanel(new GridBagLayout());
-        welcomePanel.setBackground(isDarkMode ? darkBackground : lightBackground);
-        
+        JPanel p = new JPanel(new GridBagLayout());
+        p.setBackground(isDarkMode ? darkBg : lightBg);
         GridBagConstraints gbc = new GridBagConstraints();
-        gbc.gridwidth = GridBagConstraints.REMAINDER;
-        gbc.anchor = GridBagConstraints.CENTER;
-        gbc.insets = new Insets(10, 10, 10, 10);
+        gbc.insets = new Insets(10,10,10,10);
+        gbc.gridwidth = 1;
 
-        // Welcome message
-        JLabel welcomeLabel = new JLabel("Welcome to Student Dashboard");
-        welcomeLabel.setFont(new Font("Segoe UI", Font.BOLD, 24));
-        welcomeLabel.setForeground(isDarkMode ? Color.WHITE : Color.BLACK);
-        welcomePanel.add(welcomeLabel, gbc);
+        JLabel title = new JLabel("Welcome, Student!", SwingConstants.CENTER);
+        title.setFont(new Font("Segoe UI", Font.BOLD, 26));
+        title.setForeground(new Color(44,62,80));
+        gbc.gridx = 0; gbc.gridy = 0;
+        p.add(title, gbc);
 
-        // Add some stats or quick info
         try {
-            Connection conn = DatabaseConnection.getConnection();
-            
-            // Get borrowed books count
-            PreparedStatement stmt = conn.prepareStatement(
-                "SELECT COUNT(*) FROM book_borrowings WHERE user_id = ? AND status = 'BORROWED'"
-            );
-            stmt.setInt(1, userId);
-            ResultSet rs = stmt.executeQuery();
-            if (rs.next()) {
-                JLabel statsLabel = new JLabel("Currently Borrowed Books: " + rs.getInt(1));
-                statsLabel.setFont(new Font("Segoe UI", Font.PLAIN, 16));
-                statsLabel.setForeground(isDarkMode ? Color.WHITE : Color.BLACK);
-                gbc.insets = new Insets(20, 10, 10, 10);
-                welcomePanel.add(statsLabel, gbc);
+            Document user = DatabaseConnection.getCollection("users")
+                .find(Filters.eq("_id", new ObjectId(userId))).first();
+            if (user != null) {
+                JLabel name = new JLabel("Hello, " + user.getString("full_name"), SwingConstants.CENTER);
+                name.setFont(new Font("Segoe UI", Font.PLAIN, 18));
+                name.setForeground(new Color(52,73,94));
+                gbc.gridy = 1; p.add(name, gbc);
             }
-        } catch (SQLException ex) {
-            ex.printStackTrace();
-        }
+            long borrowed = DatabaseConnection.getCollection("book_borrowings")
+                .countDocuments(Filters.and(
+                    Filters.eq("user_id", userId), Filters.eq("status","BORROWED")));
+            JLabel stats = new JLabel("Books Currently Borrowed: " + borrowed, SwingConstants.CENTER);
+            stats.setFont(new Font("Segoe UI", Font.PLAIN, 16));
+            stats.setForeground(new Color(41,128,185));
+            gbc.gridy = 2; p.add(stats, gbc);
+        } catch (Exception e) { e.printStackTrace(); }
 
-        contentPanel.add(welcomePanel);
-        contentPanel.revalidate();
-        contentPanel.repaint();
-    }
-
-    private void showBorrowBooks() {
-        contentPanel.removeAll();
-        BorrowBooksPanel borrowPanel = new BorrowBooksPanel(userId);
-        contentPanel.add(borrowPanel);
-        contentPanel.revalidate();
-        contentPanel.repaint();
-    }
-
-   
-   
-    private void showReturnBooks() {
-        contentPanel.removeAll();
-        try {
-            ReturnBooksPanel returnPanel = new ReturnBooksPanel(userId, isDarkMode);
-            contentPanel.add(returnPanel);
-        } catch (Exception ex) {
-            JPanel errorPanel = new JPanel(new GridBagLayout());
-            errorPanel.setBackground(isDarkMode ? darkBackground : lightBackground);
-            
-            JLabel errorLabel = new JLabel("Error loading return books panel: " + ex.getMessage());
-            errorLabel.setForeground(Color.RED);
-            errorLabel.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-            
-            errorPanel.add(errorLabel);
-            contentPanel.add(errorPanel);
-            ex.printStackTrace();
-        }
-        contentPanel.revalidate();
-        contentPanel.repaint();
-    }
-    
-    // Add this method to your StudentDashboard class if not already present
-    private void showErrorMessage(String message) {
-        JPanel errorPanel = new JPanel(new GridBagLayout());
-        errorPanel.setBackground(isDarkMode ? darkBackground : lightBackground);
-        
-        JLabel errorLabel = new JLabel(message);
-        errorLabel.setForeground(Color.RED);
-        errorLabel.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        
-        errorPanel.add(errorLabel);
-        contentPanel.add(errorPanel);
-        contentPanel.revalidate();
-        contentPanel.repaint();
-    }
-
-    private void showStatus() {
-        contentPanel.removeAll();
-        StatusPanel statusPanel = new StatusPanel(userId);
-        contentPanel.add(statusPanel);
-        contentPanel.revalidate();
-        contentPanel.repaint();
-    }
-
-    private void showRequestBooks() {
-        contentPanel.removeAll();
-        RequestBooksPanel requestPanel = new RequestBooksPanel(userId);
-        contentPanel.add(requestPanel);
-        contentPanel.revalidate();
-        contentPanel.repaint();
-    }
-
-    private void showNotifications() {
-        contentPanel.removeAll();
-        NotificationPanel notificationPanel = new NotificationPanel(userId, isDarkMode);    
-        contentPanel.add(notificationPanel);
-        contentPanel.revalidate();
-        contentPanel.repaint();
+        contentPanel.add(p); contentPanel.revalidate(); contentPanel.repaint();
     }
 
     private void logout() {
-        int confirm = JOptionPane.showConfirmDialog(
-            this,
-            "Are you sure you want to logout?",
-            "Confirm Logout",
-            JOptionPane.YES_NO_OPTION
-        );
-        
-        if (confirm == JOptionPane.YES_OPTION) {
-            this.dispose();
-            new LoginScreen().setVisible(true);
-        }
+        int c = JOptionPane.showConfirmDialog(this, "Are you sure you want to logout?", "Confirm Logout", JOptionPane.YES_NO_OPTION);
+        if (c == JOptionPane.YES_OPTION) { dispose(); new LoginScreen().setVisible(true); }
     }
 }
