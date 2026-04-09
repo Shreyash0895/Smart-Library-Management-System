@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  library-app:
+    build: .
+    depends_on:
+      - mongo
+    environment:
+      - MONGO_CONNECTION_STRING=mongodb://mongo:27017
+    networks:
+      - library-network
+    # For GUI apps, you might need to mount X11 socket, but this is basic setup
+    # volumes:
+    #   - /tmp/.X11-unix:/tmp/.X11-unix
+    # environment:
+    #   - DISPLAY=$DISPLAY
+
+  mongo:
+    image: mongo:5.0
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - library-network
+
+volumes:
+  mongo-data:
+
+networks:
+  library-network:
