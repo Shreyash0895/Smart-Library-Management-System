@@ -80,7 +80,7 @@ public class FineManagementPanel extends JPanel {
                     if (b != null) bTitle = b.getString("title");
                 } catch (Exception ignored) {}
 
-                double amt    = f.getDouble("amount") != null ? f.getDouble("amount") : 0;
+                double amt    = getDoubleValue(f, "amount");
                 String status = f.getString("status") != null ? f.getString("status") : "PENDING";
                 tableModel.addRow(new Object[]{
                     f.getObjectId("_id").toString(),
@@ -119,7 +119,7 @@ public class FineManagementPanel extends JPanel {
                     if (b != null) bTitle = b.getString("title");
                 } catch (Exception ignored) {}
 
-                double amt    = f.getDouble("amount") != null ? f.getDouble("amount") : 0;
+                double amt    = getDoubleValue(f, "amount");
                 String status = f.getString("status") != null ? f.getString("status") : "PENDING";
                 tableModel.addRow(new Object[]{
                     f.getObjectId("_id").toString(),
@@ -172,5 +172,18 @@ public class FineManagementPanel extends JPanel {
                 JOptionPane.showMessageDialog(this, "Error waiving fine: " + e.getMessage());
             }
         }
+    }
+
+    // Safe helper to get double from Document regardless of stored type
+    private double getDoubleValue(Document doc, String key) {
+        try {
+            Object val = doc.get(key);
+            if (val == null)             return 0.0;
+            if (val instanceof Double)   return (Double) val;
+            if (val instanceof Integer)  return ((Integer) val).doubleValue();
+            if (val instanceof Long)     return ((Long) val).doubleValue();
+            if (val instanceof String)   return Double.parseDouble((String) val);
+        } catch (Exception ignored) {}
+        return 0.0;
     }
 }

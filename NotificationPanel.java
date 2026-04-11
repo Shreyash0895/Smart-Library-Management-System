@@ -41,7 +41,8 @@ public class NotificationPanel extends JPanel {
             StringBuilder sb = new StringBuilder();
 
             for (Document doc : collection.find()) {
-                sb.append(doc.getString("message")).append("\n\n");
+                String msg = doc.getString("message");
+                if (msg != null) sb.append(msg).append("\n\n");
             }
 
             if (sb.length() == 0) {

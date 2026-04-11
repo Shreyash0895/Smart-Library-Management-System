@@ -70,9 +70,17 @@ public class IssuedBooksPanel extends JPanel {
             MongoCollection<Document> books      = DatabaseConnection.getCollection("books");
             MongoCollection<Document> users      = DatabaseConnection.getCollection("users");
 
-            Iterable<Document> docs = filter.equals("All")
-                ? borrowings.find()
-                : borrowings.find(Filters.eq("status", filter));
+            Iterable<Document> docs;
+            if (filter.equals("All")) {
+                docs = borrowings.find();
+            } else if (filter.equals("OVERDUE")) {
+                // OVERDUE = still BORROWED but past due date
+                docs = borrowings.find(Filters.and(
+                    Filters.eq("status", "BORROWED"),
+                    Filters.lt("due_date", new Date())));
+            } else {
+                docs = borrowings.find(Filters.eq("status", filter));
+            }
 
             for (Document b : docs) {
                 String bookId  = b.getString("book_id");

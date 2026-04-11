@@ -1,123 +1,166 @@
 import javax.swing.*;
 import java.awt.*;
+import com.mongodb.client.*;
+import org.bson.Document;
 
 public class StudentDashboard extends JFrame {
 
-    private JPanel contentPanel, menuPanel;
-    private boolean isDarkMode = false;
     private String userId;
+    private JPanel contentPanel;
+    private JLabel welcomeLabel;
 
     public StudentDashboard(String userId) {
-
         this.userId = userId;
 
-        setTitle("Student Dashboard");
+        setTitle("Library Management System - Student Dashboard");
         setSize(1200, 750);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
 
-        JSplitPane split = new JSplitPane();
-        split.setDividerLocation(250);
+        JSplitPane splitPane = new JSplitPane();
+        splitPane.setDividerLocation(250);
 
-        menuPanel = createMenu();
+        splitPane.setLeftComponent(createMenuPanel());
+
         contentPanel = new JPanel(new BorderLayout());
         contentPanel.setBackground(Color.WHITE);
+        splitPane.setRightComponent(contentPanel);
 
-        split.setLeftComponent(menuPanel);
-        split.setRightComponent(contentPanel);
-
-        add(split);
+        add(splitPane);
 
         showHome();
     }
 
-    private JPanel createMenu() {
+    // 🔵 SIDEBAR MENU (LIKE LIBRARIAN)
+    private JPanel createMenuPanel() {
 
         JPanel panel = new JPanel();
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
         panel.setBackground(new Color(44, 62, 80));
+        panel.setBorder(BorderFactory.createEmptyBorder(15, 10, 10, 10));
 
-        String[] items = {
-                "Dashboard",
+        JLabel title = new JLabel("Student");
+        title.setFont(new Font("Segoe UI", Font.BOLD, 18));
+        title.setForeground(Color.WHITE);
+        panel.add(title);
+
+        panel.add(Box.createRigidArea(new Dimension(0, 20)));
+
+        String[] menuItems = {
+                "Dashboard Home",
                 "Borrow Book",
                 "Return Book",
                 "Notifications",
                 "Status",
-                "ISBN Book Search",
-                "Toggle Theme",
                 "Logout"
         };
 
-        for (String item : items) {
-            JButton btn = createBtn(item);
-            btn.addActionListener(e -> handle(item));
-            panel.add(btn);
+        for (String item : menuItems) {
+            panel.add(createMenuButton(item));
             panel.add(Box.createRigidArea(new Dimension(0, 10)));
         }
 
         return panel;
     }
 
-    private JButton createBtn(String text) {
-        JButton b = new JButton(text);
-        b.setMaximumSize(new Dimension(200, 45));
-        b.setBackground(new Color(52, 152, 219));
-        b.setForeground(Color.WHITE);
-        return b;
+    // 🔘 BUTTON STYLE (MATCH LIBRARIAN)
+    private JButton createMenuButton(String text) {
+
+        JButton btn = new JButton(text);
+        btn.setMaximumSize(new Dimension(220, 45));
+        btn.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        btn.setBackground(new Color(52, 152, 219));
+        btn.setForeground(Color.WHITE);
+        btn.setFocusPainted(false);
+        btn.setBorderPainted(false);
+        btn.setFont(new Font("Segoe UI", Font.BOLD, 13));
+
+        btn.addActionListener(e -> handleMenu(text));
+
+        return btn;
     }
 
-    private void handle(String item) {
-
-        if (item.equals("Toggle Theme")) {
-            toggleTheme();
-            return;
-        }
+    // 🎯 MENU HANDLER
+    private void handleMenu(String item) {
 
         contentPanel.removeAll();
 
-        switch (item) {
-            case "Dashboard": showHome(); break;
-            case "Borrow Book": contentPanel.add(new BorrowBooksPanel(userId)); break;
-            case "Return Book": contentPanel.add(new ReturnBooksPanel(userId)); break;
-            case "Notifications": contentPanel.add(new NotificationPanel(userId)); break;
-            case "Status": contentPanel.add(new StatusPanel(userId)); break;
-            case "ISBN Book Search": contentPanel.add(new ISBNPanel()); break;
-            case "Logout":
-                dispose();
-                new LoginScreen().setVisible(true);
-                return;
-        }
+        try {
+            switch (item) {
 
-        refresh();
-    }
+                case "Dashboard Home":
+                    showHome();
+                    break;
 
-    private void toggleTheme() {
+                case "Borrow Book":
+                    contentPanel.add(new BorrowBooksPanel(userId));
+                    break;
 
-        isDarkMode = !isDarkMode;
+                case "Return Book":
+                    contentPanel.add(new ReturnBooksPanel(userId));
+                    break;
 
-        Color bg = isDarkMode ? new Color(33, 33, 33) : Color.WHITE;
-        Color menuBg = isDarkMode ? new Color(20, 20, 20) : new Color(44, 62, 80);
+                case "Notifications":
+                    contentPanel.add(new NotificationPanel(userId));
+                    break;
 
-        contentPanel.setBackground(bg);
-        menuPanel.setBackground(menuBg);
+                case "Status":
+                    contentPanel.add(new StatusPanel(userId));
+                    break;
 
-        for (Component c : menuPanel.getComponents()) {
-            if (c instanceof JButton) {
-                JButton btn = (JButton) c;
-                btn.setBackground(isDarkMode ? new Color(70, 70, 70)
-                        : new Color(52, 152, 219));
+                case "Logout":
+                    dispose();
+                    new LoginScreen().setVisible(true);
+                    return;
             }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            contentPanel.add(new JLabel("Error: " + e.getMessage()));
         }
 
-        SwingUtilities.updateComponentTreeUI(this);
-    }
-
-    private void showHome() {
-        contentPanel.add(new JLabel("Welcome Student!", SwingConstants.CENTER));
-    }
-
-    private void refresh() {
         contentPanel.revalidate();
         contentPanel.repaint();
+    }
+
+    // 🏠 HOME SCREEN (WITH USERNAME)
+    private void showHome() {
+
+        contentPanel.removeAll();
+
+        JPanel panel = new JPanel(new GridBagLayout());
+        panel.setBackground(Color.WHITE);
+
+        GridBagConstraints gbc = new GridBagConstraints();
+
+        String username = getUsername();
+
+        welcomeLabel = new JLabel("Welcome, " + username + "!");
+        welcomeLabel.setFont(new Font("Segoe UI", Font.BOLD, 26));
+
+        panel.add(welcomeLabel, gbc);
+
+        contentPanel.add(panel);
+    }
+
+    // 🔥 FETCH USERNAME FROM MONGODB
+    private String getUsername() {
+        try {
+            MongoCollection<Document> users =
+                    DatabaseConnection.getCollection("users");
+
+            Document user = users.find(new Document("_id",
+                    new org.bson.types.ObjectId(userId))).first();
+
+            if (user != null) {
+                return user.getString("username");
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return "Student";
     }
 }

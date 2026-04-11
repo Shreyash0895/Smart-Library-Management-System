@@ -10,13 +10,16 @@ import org.bson.types.ObjectId;
 public class ReturnBooksPanel extends JPanel {
     private String userId;
     private boolean isDarkMode;
+    private boolean isLibrarian;
     private DefaultTableModel model;
     private JTable table;
+    private JTextField studentSearchField;
 
     // Constructor 1 - with isDarkMode (used by LibrarianDashboard)
     public ReturnBooksPanel(String userId, boolean isDarkMode) {
         this.userId = userId;
         this.isDarkMode = isDarkMode;
+        this.isLibrarian = true;
         init();
     }
 
@@ -24,6 +27,7 @@ public class ReturnBooksPanel extends JPanel {
     public ReturnBooksPanel(String userId) {
         this.userId = userId;
         this.isDarkMode = false;
+        this.isLibrarian = false;
         init();
     }
 
@@ -34,10 +38,29 @@ public class ReturnBooksPanel extends JPanel {
         JLabel title = new JLabel("Return Books", SwingConstants.CENTER);
         title.setFont(new Font("Segoe UI", Font.BOLD, 22));
         title.setForeground(new Color(44, 62, 80));
-        add(title, BorderLayout.NORTH);
+
+        JPanel northPanel = new JPanel(new BorderLayout());
+        northPanel.add(title, BorderLayout.NORTH);
+
+        // Add student search for librarians
+        if (isLibrarian) {
+            JPanel searchPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+            searchPanel.add(new JLabel("Search Student Username:"));
+            studentSearchField = new JTextField(15);
+            JButton searchBtn = makeBtn("Search", new Color(70, 130, 180));
+            JButton showAllBtn = makeBtn("Show All", new Color(52, 152, 219));
+            searchBtn.addActionListener(e -> searchByStudent());
+            showAllBtn.addActionListener(e -> loadBorrowedBooks());
+            searchPanel.add(studentSearchField);
+            searchPanel.add(searchBtn);
+            searchPanel.add(showAllBtn);
+            northPanel.add(searchPanel, BorderLayout.CENTER);
+        }
+
+        add(northPanel, BorderLayout.NORTH);
 
         model = new DefaultTableModel(
-            new String[]{"Borrowing ID", "Book ID", "Title", "Borrow Date", "Due Date"}, 0) {
+            new String[]{"Borrowing ID", "Book ID", "Title", "Student", "Borrow Date", "Due Date"}, 0) {
             public boolean isCellEditable(int r, int c) { return false; }
         };
         table = new JTable(model);
@@ -48,8 +71,8 @@ public class ReturnBooksPanel extends JPanel {
         add(new JScrollPane(table), BorderLayout.CENTER);
 
         JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 10));
-        JButton returnBtn  = makeBtn("↩ Return Selected Book", new Color(41, 128, 185));
-        JButton refreshBtn = makeBtn("⟳ Refresh",              new Color(52, 152, 219));
+        JButton returnBtn  = makeBtn("Return Selected Book", new Color(41, 128, 185));
+        JButton refreshBtn = makeBtn("Refresh",              new Color(52, 152, 219));
         returnBtn .addActionListener(e -> returnBook());
         refreshBtn.addActionListener(e -> loadBorrowedBooks());
         btnPanel.add(returnBtn);
@@ -72,20 +95,63 @@ public class ReturnBooksPanel extends JPanel {
         model.setRowCount(0);
         try {
             MongoCollection<Document> borrowings = DatabaseConnection.getCollection("book_borrowings");
-            for (Document b : borrowings.find(
-                    Filters.and(
-                        Filters.eq("user_id", userId),
-                        Filters.eq("status", "BORROWED")))) {
+            MongoCollection<Document> users      = DatabaseConnection.getCollection("users");
+
+            // Librarians see ALL borrowed books; students see only their own
+            Iterable<Document> docs = isLibrarian
+                ? borrowings.find(Filters.eq("status", "BORROWED"))
+                : borrowings.find(Filters.and(
+                    Filters.eq("user_id", userId),
+                    Filters.eq("status", "BORROWED")));
+
+            for (Document b : docs) {
+                String studentName = "";
+                if (isLibrarian) {
+                    try {
+                        Document user = users.find(Filters.eq("_id", new ObjectId(b.getString("user_id")))).first();
+                        if (user != null) studentName = user.getString("full_name");
+                    } catch (Exception ignored) {}
+                }
                 model.addRow(new Object[]{
                     b.getObjectId("_id").toString(),
                     b.getString("book_id"),
                     b.getString("title"),
+                    studentName,
                     b.getDate("borrow_date"),
                     b.getDate("due_date")
                 });
             }
         } catch (Exception e) {
             JOptionPane.showMessageDialog(this, "Error loading borrowed books: " + e.getMessage());
+        }
+    }
+
+    private void searchByStudent() {
+        String username = studentSearchField.getText().trim();
+        if (username.isEmpty()) { loadBorrowedBooks(); return; }
+        model.setRowCount(0);
+        try {
+            MongoCollection<Document> users = DatabaseConnection.getCollection("users");
+            Document student = users.find(Filters.eq("username", username)).first();
+            if (student == null) { JOptionPane.showMessageDialog(this, "Student not found"); return; }
+            String studentId = student.getObjectId("_id").toString();
+            String studentName = student.getString("full_name");
+
+            MongoCollection<Document> borrowings = DatabaseConnection.getCollection("book_borrowings");
+            for (Document b : borrowings.find(Filters.and(
+                    Filters.eq("user_id", studentId),
+                    Filters.eq("status", "BORROWED")))) {
+                model.addRow(new Object[]{
+                    b.getObjectId("_id").toString(),
+                    b.getString("book_id"),
+                    b.getString("title"),
+                    studentName,
+                    b.getDate("borrow_date"),
+                    b.getDate("due_date")
+                });
+            }
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Error searching: " + e.getMessage());
         }
     }
 
@@ -114,7 +180,7 @@ public class ReturnBooksPanel extends JPanel {
 
             model.removeRow(row);
             JOptionPane.showMessageDialog(this,
-                "✔ Book returned successfully!", "Success", JOptionPane.INFORMATION_MESSAGE);
+                "Book returned successfully!", "Success", JOptionPane.INFORMATION_MESSAGE);
         } catch (Exception e) {
             JOptionPane.showMessageDialog(this, "Error returning book: " + e.getMessage());
         }

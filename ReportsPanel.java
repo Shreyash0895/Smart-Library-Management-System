@@ -123,12 +123,25 @@ public class ReportsPanel extends JPanel {
                 finesModel.addRow(new Object[]{
                     doc.getObjectId("_id").toString(),
                     uName, bTitle,
-                    "₹" + String.format("%.2f", doc.getDouble("amount") != null ? doc.getDouble("amount") : 0.0),
+                    "₹" + String.format("%.2f", getDoubleValue(doc, "amount")),
                     doc.getString("status")
                 });
             }
         } catch (Exception e) {
             JOptionPane.showMessageDialog(this, "Error loading fines: " + e.getMessage());
         }
+    }
+
+    // Safe helper to get double from Document regardless of stored type
+    private double getDoubleValue(Document doc, String key) {
+        try {
+            Object val = doc.get(key);
+            if (val == null)             return 0.0;
+            if (val instanceof Double)   return (Double) val;
+            if (val instanceof Integer)  return ((Integer) val).doubleValue();
+            if (val instanceof Long)     return ((Long) val).doubleValue();
+            if (val instanceof String)   return Double.parseDouble((String) val);
+        } catch (Exception ignored) {}
+        return 0.0;
     }
 }
